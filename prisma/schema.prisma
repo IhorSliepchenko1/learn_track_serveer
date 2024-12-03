@@ -1,0 +1,106 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model user {
+  id                  Int             @id @default(autoincrement())
+  email               String          @unique
+  password            String
+  name                String
+  verification_status Boolean
+  avatar_url          String?
+  role                role
+  createdAt           DateTime        @default(now())
+  updatedAt           DateTime        @updatedAt
+  progress            progress[]
+  user_response       user_response[]
+  test                test[]
+}
+
+enum role {
+  ADMIN
+  USER
+}
+
+model check_mails {
+  id                Int      @id @default(autoincrement())
+  email             String
+  verification_code String
+  expiration_at     DateTime
+  createdAt         DateTime @default(now())
+  updatedAt         DateTime @updatedAt
+}
+
+model course {
+  id          Int        @id @default(autoincrement())
+  title       String
+  description String
+  image_url   String
+  createdAt   DateTime   @default(now())
+  updatedAt   DateTime   @updatedAt
+  lessons     lesson[]
+  Progress    progress[]
+}
+
+model lesson {
+  id        Int      @id @default(autoincrement())
+  courses   course   @relation(fields: [course_id], references: [id])
+  course_id Int
+  title     String
+  content   String
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  tests     test[]
+}
+
+enum answerOption {
+  A
+  B
+  C
+  D
+}
+
+model test {
+  id             Int             @id @default(autoincrement())
+  lesson         lesson          @relation(fields: [lesson_id], references: [id])
+  lesson_id      Int
+  user           user            @relation(fields: [user_id], references: [id])
+  user_id        Int
+  question       String
+  correct_answer answerOption
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  user_response  user_response[]
+}
+
+model user_response {
+  id          Int          @id @default(autoincrement())
+  user        user         @relation(fields: [user_id], references: [id])
+  user_id     Int
+  test        test         @relation(fields: [test_id], references: [id])
+  test_id     Int
+  user_answer answerOption
+  is_correct  Boolean
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+model progress {
+  id                         Int      @id @default(autoincrement())
+  user                       user     @relation(fields: [user_id], references: [id])
+  user_id                    Int
+  courses                    course   @relation(fields: [course_id], references: [id])
+  course_id                  Int
+  count_lessons              Int
+  completed_lessons          Int
+  count_tests                Int
+  correct_answers_of_tests   Int
+  incorrect_answers_of_tests Int
+  createdAt                  DateTime @default(now())
+  updatedAt                  DateTime @updatedAt
+}
