@@ -23,17 +23,18 @@ const codeGenerator = () => {
 
 const sendCode = (verification_code, email) => {
      const transporter = nodemailer.createTransport({
-          service: "gmail",
+          service: `gmail`,
           auth: {
                user: process.env.MAIL_SEND,
                pass: process.env.PASS_SEND,
           },
      });
 
+     const now = new Date()
      const mailOptions = {
           from: `Administrator <${process.env.MAIL_SEND}>`,
           to: email,
-          subject: `Verification code`,
+          subject: `Verification code ${now.toLocaleString()}`,
           html: `<p>Ваш код для подтверждения почты: ${verification_code}</p>`,
      };
 
@@ -41,22 +42,12 @@ const sendCode = (verification_code, email) => {
           if (error) {
                return next(ApiError.internal(error.message));
           }
-
-          console.log(info)
      })
 }
 
 const timeFn = (minute) => {
      const currentTime = new Date();
      currentTime.setMinutes(currentTime.getMinutes() + minute);
-
-     // const year = currentTime.getFullYear();
-     // const month = String(currentTime.getMonth() + 1).padStart(2, '0');
-     // const day = String(currentTime.getDate()).padStart(2, '0');
-     // const hours = String(currentTime.getHours()).padStart(2, '0');
-     // const minutes = String(currentTime.getMinutes()).padStart(2, '0');
-     // const seconds = String(currentTime.getSeconds()).padStart(2, '0');
-
      return currentTime.toISOString();
 }
 
@@ -75,10 +66,26 @@ class UserController {
                     return next(ApiError.badRequest(`Пользователь авторизован!`));
                }
 
+               const checkCode = await prisma.check_mails.findFirst({
+                    where: { email },
+                    orderBy: {
+                         createdAt: 'desc',
+                    },
+               });
+
+               if (checkCode) {
+                    const expiration = new Date(checkCode.expiration_at)
+                    const now = new Date(timeFn(0))
+
+                    if (expiration > now) {
+                         return next(ApiError.badRequest(`вам уже был выслан код!`));
+                    }
+               }
+
                const verification_code = codeGenerator();
                const expiration_at = timeFn(5);
 
-               const code = await prisma.check_mails.create({
+               await prisma.check_mails.create({
                     data: {
                          email,
                          verification_code,
@@ -86,10 +93,15 @@ class UserController {
                     },
                });
 
+
                sendCode(verification_code, email);
-               return res.status(200).json({ code });
+
+               const startTimer = new Date(expiration_at);
+               startTimer.setMinutes(startTimer.getMinutes() - 5);
+
+               return res.status(200).json({ expiration_at });
           } catch (error) {
-               return next(ApiError.internal(error.message));
+               next(ApiError.internal(error.message));
           }
      }
 
@@ -99,12 +111,12 @@ class UserController {
                const { name, email, password, role, code } = req.body;
 
                if (!email || !password || !name) {
-                    return next(ApiError.notFound(`email и пароль обязательны!`));
+                    next(ApiError.notFound(`email и пароль обязательны!`));
                }
 
 
                if (password.length < 6) {
-                    return next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
+                    next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
                }
 
                const checkCode = await prisma.check_mails.findFirst({
@@ -114,21 +126,22 @@ class UserController {
                     },
                });
 
+
                const expiration = new Date(checkCode.expiration_at)
                const now = new Date(timeFn(0))
 
                if (expiration < now) {
-                    return next(ApiError.badRequest(`срок действия кода истёк`));
+                    next(ApiError.badRequest(`срок действия кода истёк`));
                }
 
                if (checkCode.verification_code !== code) {
-                    return next(ApiError.badRequest(`некорректный код верификации`));
+                    next(ApiError.badRequest(`некорректный код верификации`));
                }
 
                const candidate = await prisma.user.findUnique({ where: { email } });
 
                if (candidate) {
-                    return next(ApiError.badRequest(`${email} уже существует`));
+                    next(ApiError.badRequest(`${email} уже существует`));
                }
 
                const hashPassword = await bcrypt.hash(password, 12);
@@ -172,84 +185,147 @@ class UserController {
 
      async getAll(req, res, next) {
           try {
-               const data = await User.findAll({
+               const { page = 1, limit = 10 } = req.query;
+               const skip = (page - 1) * limit;
 
-                    order: [['createdAt', 'DESC']],
+               const [users, totalCount] = await Promise.all([
+                    prisma.user.findMany({
+                         skip: Number(skip),
+                         take: Number(limit),
+                         orderBy: {
+                              createdAt: 'desc',
+                         },
+                    }),
+                    prisma.user.count(),
+               ]);
+
+               return res.status(200).json({
+                    data: users,
+                    total: totalCount,
+                    page: Number(page),
+                    totalPages: Math.ceil(totalCount / limit),
                });
-
-               return res.status(200).json(data);
           } catch (error) {
                next(ApiError.internal(error.message));
           }
      }
 
-     //   async updateUser(req, res, next) {
-     //     const { id } = req.params;
-     //     const { login, newPassword, oldPassword, role } = req.body;
 
-     //     try {
+     async updateUser(req, res, next) {
+          const { id } = req.params;
+          const { name, email, oldPassword, newPassword, role, code } = req.body;
 
-     //       const user = await User.findOne({ where: { id } });
+          try {
 
-     //       if (!user) {
-     //         return next(ApiError.badRequest(`${id} не найден`));
-     //       }
+               if (email) {
+                    const checkEmail = await prisma.user.findUnique({ where: { email } })
+                    if (checkEmail) {
+                         return next(ApiError.badRequest(`Указанный вами email уже существует`));
+                    }
 
-     //       let isMatch
+                    const checkCode = await prisma.check_mails.findFirst({
+                         where: { email },
+                         orderBy: {
+                              createdAt: 'desc',
+                         },
+                    });
 
-     //       if (oldPassword) {
-     //         isMatch = bcrypt.compareSync(oldPassword, user.password);
+                    const expiration = new Date(checkCode.expiration_at)
+                    const now = new Date(timeFn(0))
 
-     //         if (!isMatch) {
-     //           return next(ApiError.badRequest(`Старый пароль не совпадает`));
-     //         }
-     //       }
+                    if (expiration < now) {
+                         next(ApiError.badRequest(`срок действия кода истёк`));
+                    }
 
+                    if (checkCode.verification_code !== code) {
+                         next(ApiError.badRequest(`некорректный код верификации`));
+                    }
+               }
 
+               const user = await prisma.user.findUnique({ where: { id: Number(id) } });
 
-     //       if (newPassword) {
-     //         if (newPassword.length < 6) {
-     //           return next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
-     //         }
-     //       }
+               if (!user) {
+                    return next(ApiError.badRequest(`${id} не найден`));
+               }
 
-     //       const hashPassword = newPassword ? await bcrypt.hash(newPassword, 12) : undefined
+               let isMatch
 
-     //       await User.update(
-     //         {
-     //           login: login || undefined,
-     //           password: hashPassword,
-     //           role: role || undefined
-     //         },
-     //         { where: { id } }
-     //       )
+               if (oldPassword) {
+                    isMatch = bcrypt.compareSync(oldPassword, user.password);
 
-     //       return res.status(200).json(user);
+                    if (!isMatch) {
+                         return next(ApiError.badRequest(`Старый пароль не совпадает`));
+                    }
+               }
 
-     //     }
-     //     catch (error) {
-     //       next(ApiError.internal(error.message));
-     //     }
-     //   }
+               if (newPassword) {
+                    if (newPassword.length < 6) {
+                         return next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
+                    }
+               }
 
-     //   async delete(req, res, next) {
-     //     const { id } = req.params;
+               const hashPassword = newPassword ? await bcrypt.hash(newPassword, 12) : undefined
 
-     //     try {
+               const updateUser = await prisma.user.update(
+                    {
+                         where: { id: Number(id) },
+                         data: {
+                              email: email || undefined,
+                              password: hashPassword,
+                              role: role || undefined,
+                              name: name || undefined,
+                              verification_status: true
+                         }
+                    }
+               )
 
-     //       const delId = await User.findOne({ where: { id } })
+               return res.status(200).json({ user: updateUser });
+          }
+          catch (error) {
+               next(ApiError.internal(error.message));
+          }
+     }
 
-     //       if (!delId) {
-     //         return next(ApiError.notFound(`id в базе отсутствует или ранее был удалён!`));
-     //       }
+     async delete(req, res, next) {
+          const { id } = req.params;
 
-     //       await User.destroy({ where: { id } });
+          try {
 
-     //       return res.status(200).json(`id: ${id} удалён `);
-     //     } catch (error) {
-     //       next(ApiError.internal(error.message));
-     //     }
-     //   }
+               const delId = await User.findOne({ where: { id } })
+
+               if (!delId) {
+                    return next(ApiError.notFound(`id в базе отсутствует или ранее был удалён!`));
+               }
+
+               await User.destroy({ where: { id } });
+
+               return res.status(200).json(`id: ${id} удалён `);
+          } catch (error) {
+               next(ApiError.internal(error.message));
+          }
+     }
+
+     async delete(req, res, next) {
+          try {
+               const { id } = req.params
+
+               if (!id) {
+                    next(ApiError.notFound(`Укажите id для удаления`));
+               }
+
+               const user = await prisma.user.findUnique({ where: { id: Number(id) } })
+
+               if (!user) {
+                    next(ApiError.notFound(`Пользователь не найден!`));
+               }
+
+               await prisma.user.delete({ where: { id: Number(id) } })
+
+               return res.json(`пользователь ${user.name.toUpperCase()} был удалён`)
+          } catch (error) {
+               next(ApiError.internal(error.message));
+          }
+     }
 
      async check(req, res, next) {
           try {

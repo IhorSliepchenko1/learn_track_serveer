@@ -9,8 +9,8 @@ router.post(`/send-verification-code`, userController.sendVerificationCode);
 router.post(`/registration`, userController.registration);
 router.post(`/login`, userController.login);
 router.get(`/check`, authMiddleware, userController.check);
-// router.get(`/`, authMiddleware, userController.getAll);
-// router.put(`/:id`, authMiddleware, userController.updateUser);
-// router.delete(`/:id`, checkRoleMiddleware(`ADMIN`), userController.delete);
+router.get(`/`, authMiddleware, userController.getAll);
+router.put(`/:id`, userController.updateUser);
+router.delete(`/:id`, userController.delete);
 
 module.exports = router;
