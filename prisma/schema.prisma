@@ -44,7 +44,7 @@ model course {
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   lessons     lesson[]
-  Progress    progress[]
+  progress    progress[]
 }
 
 model lesson {

@@ -3,6 +3,12 @@ const bcrypt = require(`bcryptjs`);
 const jwt = require(`jsonwebtoken`);
 const { prisma } = require(`../prisma/prisma-clients`);
 const nodemailer = require("nodemailer");
+const uuid = require(`uuid`);
+const path = require(`path`);
+const fs = require(`fs`);
+const Jdenticon = require(`jdenticon`);
+// const emailCheck = require("email-check");
+// const Verifier = require("email-verifier");
 
 const generateJwt = (id, email, role) => {
      return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
@@ -21,7 +27,7 @@ const codeGenerator = () => {
      return code
 }
 
-const sendCode = (verification_code, email) => {
+const sendCode = async (verification_code, email) => {
      const transporter = nodemailer.createTransport({
           service: `gmail`,
           auth: {
@@ -38,9 +44,9 @@ const sendCode = (verification_code, email) => {
           html: `<p>Ваш код для подтверждения почты: ${verification_code}</p>`,
      };
 
-     transporter.sendMail(mailOptions, async (error, info) => {
+     transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
-               return next(ApiError.internal(error.message));
+               next(ApiError.internal(error.message));
           }
      })
 }
@@ -57,13 +63,15 @@ class UserController {
                const { email } = req.body;
 
                if (!email) {
-                    return next(ApiError.notFound(`email обязателен!`));
+                    next(ApiError.notFound(`email обязателен!`));
                }
 
-               const candidate = await prisma.user.findUnique({ where: { email } });
+
+
+               const candidate = await prisma.user.findFirst({ where: { email } });
 
                if (candidate && candidate.verification_status) {
-                    return next(ApiError.badRequest(`Пользователь авторизован!`));
+                    next(ApiError.badRequest(`Пользователь авторизован!`));
                }
 
                const checkCode = await prisma.check_mails.findFirst({
@@ -78,7 +86,7 @@ class UserController {
                     const now = new Date(timeFn(0))
 
                     if (expiration > now) {
-                         return next(ApiError.badRequest(`вам уже был выслан код!`));
+                         next(ApiError.badRequest(`вам уже был выслан код!`));
                     }
                }
 
@@ -94,12 +102,14 @@ class UserController {
                });
 
 
-               sendCode(verification_code, email);
+               await sendCode(verification_code, email);
 
                const startTimer = new Date(expiration_at);
                startTimer.setMinutes(startTimer.getMinutes() - 5);
 
                return res.status(200).json({ expiration_at });
+
+
           } catch (error) {
                next(ApiError.internal(error.message));
           }
@@ -144,9 +154,15 @@ class UserController {
                     next(ApiError.badRequest(`${email} уже существует`));
                }
 
+               const png = Jdenticon.toPng(name, 200)
+               const avatarName = `${name}_${Date.now()}.png`
+               const avatarPath = path.join(__dirname, `..`, `static`, avatarName)
+               fs.writeFileSync(avatarPath, png)
+
                const hashPassword = await bcrypt.hash(password, 12);
+
                const user = await prisma.user.create({
-                    data: { email, password: hashPassword, role: role ? role.toUpperCase() : "USER", name, verification_status: checkCode.verification_code === code }
+                    data: { email, password: hashPassword, role: role ? role.toUpperCase() : "USER", name, verification_status: true, avatar_url: avatarName }
                });
 
                return res.json(user);
@@ -212,10 +228,21 @@ class UserController {
 
 
      async updateUser(req, res, next) {
-          const { id } = req.params;
-          const { name, email, oldPassword, newPassword, role, code } = req.body;
-
           try {
+               const { id } = req.params;
+               const { name, email, oldPassword, newPassword, role, code } = req.body;
+
+               let fileName
+
+               if (req.files && req.files.img) {
+                    const { img } = req.files
+                    fileName = uuid.v4() + ".jpg"
+                    img.mv(path.resolve(__dirname, '..', 'static', fileName))
+                    console.log(fileName);
+               } else {
+                    console.error('Файл не передан');
+                    fileName = null;
+               }
 
                if (email) {
                     const checkEmail = await prisma.user.findUnique({ where: { email } })
@@ -274,7 +301,8 @@ class UserController {
                               password: hashPassword,
                               role: role || undefined,
                               name: name || undefined,
-                              verification_status: true
+                              verification_status: true,
+                              avatar_url: fileName || undefined,
                          }
                     }
                )
@@ -282,25 +310,6 @@ class UserController {
                return res.status(200).json({ user: updateUser });
           }
           catch (error) {
-               next(ApiError.internal(error.message));
-          }
-     }
-
-     async delete(req, res, next) {
-          const { id } = req.params;
-
-          try {
-
-               const delId = await User.findOne({ where: { id } })
-
-               if (!delId) {
-                    return next(ApiError.notFound(`id в базе отсутствует или ранее был удалён!`));
-               }
-
-               await User.destroy({ where: { id } });
-
-               return res.status(200).json(`id: ${id} удалён `);
-          } catch (error) {
                next(ApiError.internal(error.message));
           }
      }

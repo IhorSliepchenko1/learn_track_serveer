@@ -1,14 +1,25 @@
 require(`dotenv`).config();
+const path = require(`path`)
+const fs = require(`fs`)
 const express = require(`express`);
 const cors = require(`cors`);
 const bodyParser = require(`body-parser`);
 const ApiError = require(`./error/ApiError.js`);
 const router = require(`./routes/index.js`);
+const fileUpload = require(`express-fileupload`);
 const PORT = process.env.PORT || 5000;
 const app = express();
 
+const staticDir = path.resolve(__dirname, `static`)
+
+if (!fs.existsSync(staticDir)) {
+  fs.mkdirSync(staticDir);
+}
+
 app.use(cors());
 app.use(bodyParser.json());
+app.use(express.static(staticDir));
+app.use(fileUpload({}));
 app.use(`/api`, router);
 
 app.use((err, req, res, next) => {
