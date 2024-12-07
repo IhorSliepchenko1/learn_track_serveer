@@ -66,49 +66,46 @@ class UserController {
                     next(ApiError.notFound(`email обязателен!`));
                }
 
+               const candidate = await prisma.user.findUnique({ where: { email } });
+
+               if (!candidate) {
+                    const checkCode = await prisma.check_mails.findFirst({
+                         where: { email },
+                         orderBy: {
+                              createdAt: 'desc',
+                         },
+                    });
+
+                    if (checkCode) {
+                         const expiration = new Date(checkCode.expiration_at)
+                         const now = new Date(timeFn(0))
+
+                         if (expiration > now) {
+                              next(ApiError.badRequest(`вам уже был выслан код!`));
+                         }
+                    }
+
+                    const verification_code = codeGenerator();
+                    const expiration_at = timeFn(5);
+
+                    await prisma.check_mails.create({
+                         data: {
+                              email,
+                              verification_code,
+                              expiration_at,
+                         },
+                    });
 
 
-               const candidate = await prisma.user.findFirst({ where: { email } });
+                    sendCode(verification_code, email);
 
-               if (candidate && candidate.verification_status) {
+                    const startTimer = new Date(expiration_at);
+                    startTimer.setMinutes(startTimer.getMinutes() - 5);
+
+                    return res.status(200).json({ expiration_at });
+               } else {
                     next(ApiError.badRequest(`Пользователь авторизован!`));
                }
-
-               const checkCode = await prisma.check_mails.findFirst({
-                    where: { email },
-                    orderBy: {
-                         createdAt: 'desc',
-                    },
-               });
-
-               if (checkCode) {
-                    const expiration = new Date(checkCode.expiration_at)
-                    const now = new Date(timeFn(0))
-
-                    if (expiration > now) {
-                         next(ApiError.badRequest(`вам уже был выслан код!`));
-                    }
-               }
-
-               const verification_code = codeGenerator();
-               const expiration_at = timeFn(5);
-
-               await prisma.check_mails.create({
-                    data: {
-                         email,
-                         verification_code,
-                         expiration_at,
-                    },
-               });
-
-
-               await sendCode(verification_code, email);
-
-               const startTimer = new Date(expiration_at);
-               startTimer.setMinutes(startTimer.getMinutes() - 5);
-
-               return res.status(200).json({ expiration_at });
-
 
           } catch (error) {
                next(ApiError.internal(error.message));
@@ -136,6 +133,9 @@ class UserController {
                     },
                });
 
+               if (!checkCode) {
+                    next(ApiError.notFound(`Сначала получите код`));
+               }
 
                const expiration = new Date(checkCode.expiration_at)
                const now = new Date(timeFn(0))

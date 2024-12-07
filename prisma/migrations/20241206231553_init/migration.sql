@@ -1,4 +1,7 @@
 -- CreateEnum
+CREATE TYPE "role" AS ENUM ('ADMIN', 'USER');
+
+-- CreateEnum
 CREATE TYPE "answerOption" AS ENUM ('A', 'B', 'C', 'D');
 
 -- CreateTable
@@ -8,7 +11,8 @@ CREATE TABLE "user" (
     "password" TEXT NOT NULL,
     "name" TEXT NOT NULL,
     "verification_status" BOOLEAN NOT NULL,
-    "avatar_url" TEXT NOT NULL,
+    "avatar_url" TEXT,
+    "role" "role" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -92,6 +96,9 @@ CREATE TABLE "progress" (
 
     CONSTRAINT "progress_pkey" PRIMARY KEY ("id")
 );
+
+-- CreateIndex
+CREATE UNIQUE INDEX "user_email_key" ON "user"("email");
 
 -- AddForeignKey
 ALTER TABLE "lesson" ADD CONSTRAINT "lesson_course_id_fkey" FOREIGN KEY ("course_id") REFERENCES "course"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
