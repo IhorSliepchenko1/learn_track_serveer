@@ -27,6 +27,7 @@
     "nodemailer": "^6.9.16",
     "pg": "^8.13.0",
     "pg-hstore": "^2.3.4",
+    "rate-limiter-flexible": "^5.0.4",
     "sequelize": "^6.37.4",
     "uuid": "^10.0.0"
   }

@@ -7,11 +7,9 @@ const uuid = require(`uuid`);
 const path = require(`path`);
 const fs = require(`fs`);
 const Jdenticon = require(`jdenticon`);
-// const emailCheck = require("email-check");
-// const Verifier = require("email-verifier");
 
-const generateJwt = (id, email, role) => {
-     return jwt.sign({ id, email, role }, process.env.SECRET_KEY, {
+const generateJwt = (id, email, role, name, avatar_url) => {
+     return jwt.sign({ id, email, role, name, avatar_url }, process.env.SECRET_KEY, {
           expiresIn: `24h`,
      });
 };
@@ -225,6 +223,25 @@ class UserController {
                next(ApiError.internal(error.message));
           }
      }
+     async getById(req, res, next) {
+          try {
+               const { id } = req.params
+               if (!id) {
+                    next(ApiError.notFound(`id обязателен!`));
+               }
+
+               const user = await prisma.user.findFirst({ where: { id } })
+
+               if (!user) {
+                    next(ApiError.notFound(`Пользователь не обнаружен!`));
+               }
+
+               return res.status(200).json(user);
+
+          } catch (error) {
+               next(ApiError.internal(error.message));
+          }
+     }
 
 
      async updateUser(req, res, next) {
@@ -338,7 +355,7 @@ class UserController {
 
      async check(req, res, next) {
           try {
-               const token = generateJwt(req.user.id, req.user.email, req.user.role);
+               const token = generateJwt(req.user.id, req.user.email, req.user.role, req.user.name, req.user.avatar_url);
 
                return res.json({ token });
           } catch (error) {

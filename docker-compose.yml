@@ -29,7 +29,7 @@ services:
 
   react-app:
     build:
-      context: ../client
+      context: ../learn_track_client
       dockerfile: Dockerfile
     ports:
       - "80:80"
