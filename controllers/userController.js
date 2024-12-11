@@ -8,8 +8,8 @@ const path = require(`path`);
 const fs = require(`fs`);
 const Jdenticon = require(`jdenticon`);
 
-const generateJwt = (id, email, role, name, avatar_url) => {
-     return jwt.sign({ id, email, role, name, avatar_url }, process.env.SECRET_KEY, {
+const generateJwt = (user) => {
+     return jwt.sign({ id: user.id, role: user.role, name: user.name, email: user.email, verification_status: user.verification_status, avatar_url: user.avatar_url }, process.env.SECRET_KEY, {
           expiresIn: `24h`,
      });
 };
@@ -44,7 +44,7 @@ const sendCode = async (verification_code, email) => {
 
      transporter.sendMail(mailOptions, (error, info) => {
           if (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      })
 }
@@ -61,7 +61,7 @@ class UserController {
                const { email } = req.body;
 
                if (!email) {
-                    next(ApiError.notFound(`email обязателен!`));
+                    return next(ApiError.notFound(`email обязателен!`));
                }
 
                const candidate = await prisma.user.findUnique({ where: { email } });
@@ -79,7 +79,7 @@ class UserController {
                          const now = new Date(timeFn(0))
 
                          if (expiration > now) {
-                              next(ApiError.badRequest(`вам уже был выслан код!`));
+                              return next(ApiError.badRequest(`вам уже был выслан код!`));
                          }
                     }
 
@@ -102,11 +102,11 @@ class UserController {
 
                     return res.status(200).json({ expiration_at });
                } else {
-                    next(ApiError.badRequest(`Пользователь авторизован!`));
+                    return next(ApiError.badRequest(`Пользователь авторизован!`));
                }
 
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
@@ -116,12 +116,12 @@ class UserController {
                const { name, email, password, role, code } = req.body;
 
                if (!email || !password || !name) {
-                    next(ApiError.notFound(`email и пароль обязательны!`));
+                    return next(ApiError.notFound(`email и пароль обязательны!`));
                }
 
 
                if (password.length < 6) {
-                    next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
+                    return next(ApiError.badRequest(`Пароль должен быть не менее 6 символов`));
                }
 
                const checkCode = await prisma.check_mails.findFirst({
@@ -132,24 +132,24 @@ class UserController {
                });
 
                if (!checkCode) {
-                    next(ApiError.notFound(`Сначала получите код`));
+                    return next(ApiError.notFound(`Сначала получите код`));
                }
 
                const expiration = new Date(checkCode.expiration_at)
                const now = new Date(timeFn(0))
 
                if (expiration < now) {
-                    next(ApiError.badRequest(`срок действия кода истёк`));
+                    return next(ApiError.badRequest(`срок действия кода истёк`));
                }
 
                if (checkCode.verification_code !== code) {
-                    next(ApiError.badRequest(`некорректный код верификации`));
+                    return next(ApiError.badRequest(`некорректный код верификации`));
                }
 
                const candidate = await prisma.user.findUnique({ where: { email } });
 
                if (candidate) {
-                    next(ApiError.badRequest(`${email} уже существует`));
+                    return next(ApiError.badRequest(`${email} уже существует`));
                }
 
                const png = Jdenticon.toPng(name, 200)
@@ -165,7 +165,7 @@ class UserController {
 
                return res.json(user);
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
@@ -174,26 +174,26 @@ class UserController {
                const { email, password } = req.body;
 
                if (!email || !password) {
-                    next(ApiError.notFound(`Логин и пароль обязательны!`));
+                    return next(ApiError.notFound(`Логин и пароль обязательны!`));
                }
 
                const user = await prisma.user.findUnique({ where: { email } });
 
                if (!user) {
-                    next(ApiError.badRequest(`${email} не найден`));
+                    return next(ApiError.badRequest(`${email} не найден`));
                }
 
                const comparePassword = bcrypt.compareSync(password, user.password);
 
                if (!comparePassword) {
-                    next(ApiError.unauthorized(`Указан неверный логин или пароль`));
+                    return next(ApiError.unauthorized(`Указан неверный логин или пароль`));
                }
 
                const token = generateJwt(user.id, user.login, user.role);
 
                return res.json({ token });
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
@@ -220,26 +220,26 @@ class UserController {
                     totalPages: Math.ceil(totalCount / limit),
                });
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
      async getById(req, res, next) {
           try {
                const { id } = req.params
                if (!id) {
-                    next(ApiError.notFound(`id обязателен!`));
+                    return next(ApiError.notFound(`id обязателен!`));
                }
 
                const user = await prisma.user.findFirst({ where: { id } })
 
                if (!user) {
-                    next(ApiError.notFound(`Пользователь не обнаружен!`));
+                    return next(ApiError.notFound(`Пользователь не обнаружен!`));
                }
 
                return res.status(200).json(user);
 
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
@@ -247,7 +247,7 @@ class UserController {
      async updateUser(req, res, next) {
           try {
                const { id } = req.params;
-               const { name, email, oldPassword, newPassword, role, code } = req.body;
+               const { name, email, oldPassword, newPassword, role, code, img } = req.body;
 
                let fileName
 
@@ -278,11 +278,11 @@ class UserController {
                     const now = new Date(timeFn(0))
 
                     if (expiration < now) {
-                         next(ApiError.badRequest(`срок действия кода истёк`));
+                         return next(ApiError.badRequest(`срок действия кода истёк`));
                     }
 
                     if (checkCode.verification_code !== code) {
-                         next(ApiError.badRequest(`некорректный код верификации`));
+                         return next(ApiError.badRequest(`некорректный код верификации`));
                     }
                }
 
@@ -327,7 +327,7 @@ class UserController {
                return res.status(200).json({ user: updateUser });
           }
           catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
@@ -336,30 +336,32 @@ class UserController {
                const { id } = req.params
 
                if (!id) {
-                    next(ApiError.notFound(`Укажите id для удаления`));
+                    return next(ApiError.notFound(`Укажите id для удаления`));
                }
 
                const user = await prisma.user.findUnique({ where: { id: Number(id) } })
 
                if (!user) {
-                    next(ApiError.notFound(`Пользователь не найден!`));
+                    return next(ApiError.notFound(`Пользователь не найден!`));
                }
 
                await prisma.user.delete({ where: { id: Number(id) } })
 
                return res.json(`пользователь ${user.name.toUpperCase()} был удалён`)
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 
      async check(req, res, next) {
           try {
-               const token = generateJwt(req.user.id, req.user.email, req.user.role, req.user.name, req.user.avatar_url);
+               const { id } = req.user
+               const user = await prisma.user.findFirst({ where: { id } })
+               const token = generateJwt(user);
 
                return res.json({ token });
           } catch (error) {
-               next(ApiError.internal(error.message));
+               return next(ApiError.internal(error.message));
           }
      }
 }
