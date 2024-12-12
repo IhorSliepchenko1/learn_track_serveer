@@ -11,7 +11,7 @@ router.post(`/login`, registrationLimiter, userController.login);
 router.get(`/check`, authMiddleware, userController.check);
 router.get(`/`, authMiddleware, userController.getAll);
 router.get(`/:id`, authMiddleware, userController.getById);
-router.put(`/:id`, userController.updateUser);
+router.put(`/:id`, authMiddleware, userController.updateUser);
 router.delete(`/:id`, checkRoleMiddleware(`ADMIN`), userController.delete);
 
 module.exports = router;
