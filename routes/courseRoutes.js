@@ -4,7 +4,7 @@ const courseController = require(`../controllers/courseController`);
 const authMiddleware = require(`../middleware/authMiddleware`);
 const checkRoleMiddleware = require(`../middleware/checkRoleMiddleware`);
 // +
-router.post(`/add`, authMiddleware, courseController.add);
+router.post(`/add`, courseController.add);
 router.put(`/:id`, checkRoleMiddleware(`ADMIN`), courseController.update);
 router.delete(`/:id`, courseController.delete);
 router.get(`/`, authMiddleware, courseController.getAll);

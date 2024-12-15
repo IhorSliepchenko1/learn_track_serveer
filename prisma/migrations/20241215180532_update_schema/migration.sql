@@ -36,7 +36,7 @@ CREATE TABLE "course" (
     "id" SERIAL NOT NULL,
     "title" TEXT NOT NULL,
     "description" TEXT NOT NULL,
-    "image_url" TEXT NOT NULL,
+    "image_url" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     "updatedAt" TIMESTAMP(3) NOT NULL,
 
@@ -59,7 +59,6 @@ CREATE TABLE "lesson" (
 CREATE TABLE "test" (
     "id" SERIAL NOT NULL,
     "lesson_id" INTEGER NOT NULL,
-    "user_id" INTEGER NOT NULL,
     "question" TEXT NOT NULL,
     "correct_answer" "answerOption" NOT NULL,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -71,6 +70,7 @@ CREATE TABLE "test" (
 -- CreateTable
 CREATE TABLE "user_response" (
     "id" SERIAL NOT NULL,
+    "lesson_id" INTEGER NOT NULL,
     "user_id" INTEGER NOT NULL,
     "test_id" INTEGER NOT NULL,
     "user_answer" "answerOption" NOT NULL,
@@ -107,10 +107,10 @@ ALTER TABLE "lesson" ADD CONSTRAINT "lesson_course_id_fkey" FOREIGN KEY ("course
 ALTER TABLE "test" ADD CONSTRAINT "test_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lesson"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "test" ADD CONSTRAINT "test_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_response" ADD CONSTRAINT "user_response_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
-ALTER TABLE "user_response" ADD CONSTRAINT "user_response_user_id_fkey" FOREIGN KEY ("user_id") REFERENCES "user"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+ALTER TABLE "user_response" ADD CONSTRAINT "user_response_lesson_id_fkey" FOREIGN KEY ("lesson_id") REFERENCES "lesson"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 
 -- AddForeignKey
 ALTER TABLE "user_response" ADD CONSTRAINT "user_response_test_id_fkey" FOREIGN KEY ("test_id") REFERENCES "test"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -102,29 +102,61 @@ class CourseController {
                     return next(ApiError.notFound(`курс не найден`))
                }
 
-               let lessons = await prisma.lesson.findMany({
-                    where: { course_id: Number(id) },
-               })
+               await prisma.$transaction(async (prisma) => {
+                    // Удаляем все тесты, связанные с курсом через уроки
+                    await prisma.test.deleteMany({
+                         where: {
+                              lesson: {
+                                   course_id: Number(id),
+                              },
+                         },
+                    });
 
-               lessons.forEach(async (lesson) => {
-                    let tests = await prisma.test.findMany({
-                         where: { lesson_id: Number(lesson.id) },
-                    })
+                    // Удаляем все уроки, связанные с курсом
+                    await prisma.lesson.deleteMany({
+                         where: { course_id: Number(id) },
+                    });
 
-                    tests.forEach(async (test) => {
-                         await prisma.test.delete({
-                              where: { id: Number(test.id) },
-                         })
-                    })
+                    // Удаляем все записи прогресса, связанные с курсом
+                    await prisma.progress.deleteMany({
+                         where: { course_id: Number(id) },
+                    });
 
-                    await prisma.lesson.delete({
-                         where: { id: Number(lesson.id) },
-                    })
-               })
+                    // Удаляем сам курс
+                    await prisma.course.delete({
+                         where: { id: Number(id) },
+                    });
+               });
 
-               await prisma.course.delete({
-                    where: { id: Number(id) }
-               })
+               // const lessons = await prisma.lesson.findMany({
+               //      where: { course_id: Number(id) },
+               // })
+
+
+               // lessons.forEach(async (lesson) => {
+               //      let tests = await prisma.test.findMany({
+               //           where: { lesson_id: Number(lesson.id) },
+               //      })
+
+               //      tests.forEach(async (test) => {
+               //           await prisma.test.delete({
+               //                where: { id: Number(test.id) },
+               //           })
+               //      })
+               // })
+
+               // await prisma.lesson.deleteMany({
+               //      where: { id: Number(lessons[0].id) },
+               // })
+
+               // await prisma.progress.deleteMany({
+               //      where: { course_id: Number(id) },
+               // })
+
+
+               // await prisma.course.delete({
+               //      where: { id: Number(id) }
+               // })
 
                return res.status(200).json(`Курс ${checkId.title} удалён`);
 
