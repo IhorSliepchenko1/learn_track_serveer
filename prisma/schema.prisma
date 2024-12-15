@@ -19,7 +19,6 @@ model user {
   updatedAt           DateTime        @updatedAt
   progress            progress[]
   user_response       user_response[]
-  test                test[]
 }
 
 enum role {
@@ -40,7 +39,7 @@ model course {
   id          Int        @id @default(autoincrement())
   title       String
   description String
-  image_url   String
+  image_url   String?
   createdAt   DateTime   @default(now())
   updatedAt   DateTime   @updatedAt
   lessons     lesson[]
@@ -48,14 +47,15 @@ model course {
 }
 
 model lesson {
-  id        Int      @id @default(autoincrement())
-  courses   course   @relation(fields: [course_id], references: [id])
-  course_id Int
-  title     String
-  content   String
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-  tests     test[]
+  id            Int             @id @default(autoincrement())
+  courses       course          @relation(fields: [course_id], references: [id])
+  course_id     Int
+  title         String
+  content       String
+  createdAt     DateTime        @default(now())
+  updatedAt     DateTime        @updatedAt
+  tests         test[]
+  user_response user_response[]
 }
 
 enum answerOption {
@@ -69,8 +69,6 @@ model test {
   id             Int             @id @default(autoincrement())
   lesson         lesson          @relation(fields: [lesson_id], references: [id])
   lesson_id      Int
-  user           user            @relation(fields: [user_id], references: [id])
-  user_id        Int
   question       String
   correct_answer answerOption
   createdAt      DateTime        @default(now())
@@ -81,6 +79,8 @@ model test {
 model user_response {
   id          Int          @id @default(autoincrement())
   user        user         @relation(fields: [user_id], references: [id])
+  lesson      lesson       @relation(fields: [lesson_id], references: [id])
+  lesson_id   Int
   user_id     Int
   test        test         @relation(fields: [test_id], references: [id])
   test_id     Int

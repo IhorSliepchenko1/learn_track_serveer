@@ -9,7 +9,6 @@ const router = require(`./routes/index.js`);
 const fileUpload = require(`express-fileupload`);
 const PORT = process.env.PORT || 5000;
 const app = express();
-const { prisma } = require(`./prisma/prisma-clients.js`)
 
 const staticDir = path.resolve(__dirname, `static`)
 

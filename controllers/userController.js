@@ -9,7 +9,16 @@ const fs = require(`fs`);
 const Jdenticon = require(`jdenticon`);
 
 const generateJwt = (user) => {
-     return jwt.sign({ id: user.id, role: user.role, name: user.name, email: user.email, verification_status: user.verification_status, avatar_url: user.avatar_url }, process.env.SECRET_KEY, {
+     return jwt.sign(
+          {
+               id: user.id,
+               role: user.role,
+               name: user.name,
+               email: user.email,
+               verification_status: user.verification_status,
+               avatar_url: user.avatar_url
+          }
+          , process.env.SECRET_KEY, {
           expiresIn: `24h`,
      });
 };
@@ -110,7 +119,6 @@ class UserController {
           }
      }
 
-
      async registration(req, res, next) {
           try {
                const { name, email, password, role, code } = req.body;
@@ -163,7 +171,7 @@ class UserController {
                     data: { email, password: hashPassword, role: role ? role.toUpperCase() : "USER", name, verification_status: true, avatar_url: avatarName }
                });
 
-               return res.json(user);
+               return res.status(200).json(user);
           } catch (error) {
                return next(ApiError.internal(error.message));
           }
@@ -191,7 +199,7 @@ class UserController {
 
                const token = generateJwt(user.id, user.login, user.role);
 
-               return res.json({ token });
+               return res.status(200).json({ token });
           } catch (error) {
                return next(ApiError.internal(error.message));
           }
@@ -223,9 +231,11 @@ class UserController {
                return next(ApiError.internal(error.message));
           }
      }
+
      async getById(req, res, next) {
           try {
                const { id } = req.params
+
                if (!id) {
                     return next(ApiError.notFound(`id обязателен!`));
                }
@@ -243,11 +253,10 @@ class UserController {
           }
      }
 
-
      async updateUser(req, res, next) {
           try {
                const { id } = req.params;
-               const { name, email, oldPassword, newPassword, role, code, img } = req.body;
+               const { name, email, oldPassword, newPassword, role, code } = req.body;
 
                let fileName
 
@@ -263,6 +272,7 @@ class UserController {
 
                if (email) {
                     const checkEmail = await prisma.user.findUnique({ where: { email } })
+
                     if (checkEmail) {
                          return next(ApiError.badRequest(`Указанный вами email уже существует`));
                     }
@@ -347,7 +357,7 @@ class UserController {
 
                await prisma.user.delete({ where: { id: Number(id) } })
 
-               return res.json(`пользователь ${user.name.toUpperCase()} был удалён`)
+               return res.status(200).json(`пользователь ${user.name.toUpperCase()} был удалён`)
           } catch (error) {
                return next(ApiError.internal(error.message));
           }
@@ -359,7 +369,7 @@ class UserController {
                const user = await prisma.user.findFirst({ where: { id } })
                const token = generateJwt(user);
 
-               return res.json({ token });
+               return res.status(200).json({ token });
           } catch (error) {
                return next(ApiError.internal(error.message));
           }

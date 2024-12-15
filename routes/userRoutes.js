@@ -5,7 +5,7 @@ const authMiddleware = require(`../middleware/authMiddleware`);
 const checkRoleMiddleware = require(`../middleware/checkRoleMiddleware`);
 const registrationLimiter = require(`../middleware/registrationMiddleware`)
 // +
-router.post(`/send-verification-code`, registrationLimiter, userController.sendVerificationCode);
+router.post(`/send-verification-code`, userController.sendVerificationCode);
 router.post(`/registration`, registrationLimiter, userController.registration);
 router.post(`/login`, registrationLimiter, userController.login);
 router.get(`/check`, authMiddleware, userController.check);
