@@ -1,111 +1,122 @@
-const ApiError = require(`../error/ApiError`)
+const ApiError = require(`../error/ApiError`);
 const { prisma } = require(`../prisma/prisma-clients`);
 
 class UserResponseController {
-     async userResponse(req, res, next) {
-          try {
-               const { id } = req.user
-               const { lesson_id, test_id, user_answer } = req.body
+  async userResponse(req, res, next) {
+    try {
+      const { id } = req.user;
+      const { lesson_id, test_id, user_answer } = req.body;
 
-               if (!lesson_id || !test_id || !user_answer || !id) {
-                    return next(ApiError.badRequest('Все данные обязательны'));
-               }
+      if (!lesson_id || !test_id || !user_answer || !id) {
+        return next(ApiError.badRequest("Все данные обязательны"));
+      }
 
-               const lesson = await prisma.lesson.findFirst({ where: { id: Number(lesson_id) } })
+      const checkTest = await prisma.user_response.findFirst({
+        where: {
+          user_id: Number(id),
+          test_id: Number(test_id),
+          lesson_id: Number(lesson_id),
+        },
+      });
 
-               if (!lesson) {
-                    return next(ApiError.notFound('Урок не найден'));
-               }
-               const test = await prisma.test.findFirst({ where: { id: Number(test_id) } })
+      if (checkTest) {
+        return next(ApiError.badRequest("Вы уже отвечали на этот вопрос"));
+      }
 
-               if (!test) {
-                    return next(ApiError.notFound('Тест не найден'));
-               }
+      const lesson = await prisma.lesson.findFirst({
+        where: {
+          id: Number(lesson_id),
+          tests: {
+            some: {
+              id: Number(test_id),
+            },
+          },
+        },
+      });
 
-               const is_correct = user_answer === test.correct_answer
+      if (!lesson) {
+        return next(ApiError.notFound("Урок или тест не найден"));
+      }
+      const test = await prisma.test.findFirst({
+        where: { id: Number(test_id) },
+      });
 
-               const userResponse = await prisma.user_response.create({
-                    data: {
-                         lesson_id: Number(lesson_id),
-                         user_id: Number(id),
-                         test_id: Number(test_id),
-                         user_answer,
-                         is_correct
-                    }
-               })
+      if (!test) {
+        return next(ApiError.notFound("Тест не найден"));
+      }
 
+      const is_correct = user_answer === test.correct_answer;
 
-               const count_lessons = await prisma.lesson.findMany({ where: { course_id: Number(lesson.course_id) } })
-               const completed_lessons = await prisma.user_response.findMany({
-                    where: {
-                         user_id: Number(id),
-                         lesson_id: Number(lesson_id),
-                         test_id: Number(test_id)
-                    }
-               })
+      const userResponse = await prisma.user_response.create({
+        data: {
+          lesson_id: Number(lesson_id),
+          user_id: Number(id),
+          test_id: Number(test_id),
+          user_answer,
+          is_correct,
+        },
+      });
 
-               const correct_answers_of_tests = completed_lessons.filter((item) => {
-                    return item.is_correct
-               }).length
+      res.status(200).json({ userResponse });
+    } catch (error) {
+      return next(ApiError.internal(error.message));
+    }
+  }
+  async delete(req, res, next) {
+    try {
+      const { id } = req.user;
+      const { lesson_id } = req.body;
 
-               const progress = await prisma.progress.findFirst({
-                    where: {
-                         user_id: Number(id),
-                         course_id: Number(lesson.course_id)
-                    }
-               })
+      if (!lesson_id) {
+        return next(ApiError.notFound(`lesson_id не обнаружен`));
+      }
 
-               const count_tests = await prisma.test.findMany({
-                    where: { lesson_id: Number(count_lessons[0].id) }
-               })
+      const checkId = await prisma.lesson.findFirst({
+        where: { id: Number(lesson_id) },
+      });
 
-               await prisma.progress.update({
-                    where: { id: Number(progress.id) },
+      if (!checkId) {
+        return next(ApiError.notFound(`lesson не найден`));
+      }
 
-                    data: {
-                         count_lessons: Number(count_lessons.length) || undefined,
-                         count_tests: Number(count_tests.length) || undefined,
-                         completed_lessons: Number(completed_lessons.length) || undefined,
-                         correct_answers_of_tests: Number(correct_answers_of_tests) || undefined,
-                         incorrect_answers_of_tests: Number(completed_lessons.length - correct_answers_of_tests) || undefined
-                    }
-               })
+      await prisma.user_response.deleteMany({
+        where: {
+          lesson_id: Number(lesson_id),
+          user_id: Number(id),
+        },
+      });
 
+      return res.status(200).json(`Тест ${lesson_id} удалён`);
+    } catch (error) {
+      return next(ApiError.internal(error.message));
+    }
+  }
+  async getAll(req, res, next) {
+    try {
+      const { id } = req.body;
 
-               res.status(200).json({ userResponse })
+      const userResponse = await prisma.user_response.findMany({
+        where: { user_id: id },
+      });
 
-          } catch (error) {
-               return next(ApiError.internal(error.message))
-          }
-     }
-     async getAll(req, res, next) {
-          try {
-               const { id } = req.body
+      res.status(200).json({ userResponse });
+    } catch (error) {
+      return next(ApiError.internal(error.message));
+    }
+  }
+  async getById(req, res, next) {
+    try {
+      const { id } = req.body;
 
-               const userResponse = await prisma.user_response.findMany({
-                    where: { user_id: id }
-               })
+      const userResponse = await prisma.user_response.findMany({
+        where: { id },
+      });
 
-               res.status(200).json({ userResponse })
-
-          } catch (error) {
-               return next(ApiError.internal(error.message))
-          }
-     }
-     async getById(req, res, next) {
-          try {
-               const { id } = req.body
-
-               const userResponse = await prisma.user_response.findMany({
-                    where: { id }
-               })
-
-               res.status(200).json({ userResponse })
-
-          } catch (error) {
-               return next(ApiError.internal(error.message))
-          }
-     }
+      res.status(200).json({ userResponse });
+    } catch (error) {
+      return next(ApiError.internal(error.message));
+    }
+  }
 }
 
-module.exports = new UserResponseController()
+module.exports = new UserResponseController();

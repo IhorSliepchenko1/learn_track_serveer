@@ -17,7 +17,6 @@ model user {
   role                role
   createdAt           DateTime        @default(now())
   updatedAt           DateTime        @updatedAt
-  progress            progress[]
   user_response       user_response[]
 }
 
@@ -36,14 +35,13 @@ model check_mails {
 }
 
 model course {
-  id          Int        @id @default(autoincrement())
+  id          Int      @id @default(autoincrement())
   title       String
   description String
   image_url   String?
-  createdAt   DateTime   @default(now())
-  updatedAt   DateTime   @updatedAt
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
   lessons     lesson[]
-  progress    progress[]
 }
 
 model lesson {
@@ -88,19 +86,4 @@ model user_response {
   is_correct  Boolean
   createdAt   DateTime     @default(now())
   updatedAt   DateTime     @updatedAt
-}
-
-model progress {
-  id                         Int      @id @default(autoincrement())
-  user                       user     @relation(fields: [user_id], references: [id])
-  user_id                    Int
-  courses                    course   @relation(fields: [course_id], references: [id])
-  course_id                  Int
-  count_lessons              Int
-  completed_lessons          Int
-  count_tests                Int
-  correct_answers_of_tests   Int
-  incorrect_answers_of_tests Int
-  createdAt                  DateTime @default(now())
-  updatedAt                  DateTime @updatedAt
 }

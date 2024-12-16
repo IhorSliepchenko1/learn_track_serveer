@@ -93,6 +93,7 @@ class TestController {
                return next(ApiError.internal(error.message))
           }
      }
+     
      async getAll(req, res, next) {
           try {
                const { page = 1, limit = 10 } = req.query;

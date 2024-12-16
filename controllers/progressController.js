@@ -1,55 +1,65 @@
-const ApiError = require(`../error/ApiError`)
+const ApiError = require(`../error/ApiError`);
 const { prisma } = require(`../prisma/prisma-clients`);
 
 class ProgressController {
-     async add(req, res, next) {
-          try {
-               const { id } = req.user
-               const { course_id } = req.body
+  async checkProgress(req, res, next) {
+    try {
+      const { id } = req.user;
+      const { course_id } = req.body;
 
-               if (!id || !course_id) {
-                    return next(ApiError.notFound(`Все данные обязательны`))
-               }
+      if (!course_id) {
+        return next(ApiError.badRequest("ID курса обязателен"));
+      }
 
-               const check = await prisma.progress.findFirst({
-                    where: {
-                         course_id: Number(course_id),
-                         user_id: Number(id)
-                    }
-               })
+      const countLessons = await prisma.lesson.findMany({
+        where: { course_id: Number(course_id) },
+      });
 
-               if (check) {
-                    return next(ApiError.badRequest(`Прогресс под этот курс у вас уже существует`))
-               }
+      const tests = await Promise.all(
+        countLessons.map(async (lesson) => {
+          const testData = await prisma.test.findMany({
+            where: { lesson_id: lesson.id },
+          });
 
-               const count_lessons = await prisma.lesson.findMany({
-                    where: { course_id: Number(course_id) }
-               })
+          const userResponse = await prisma.user_response.findMany({
+            where: { user_id: Number(id), lesson_id: lesson.id },
+          });
 
-               const count_tests = await prisma.test.findMany({
-                    where: { lesson_id: Number(count_lessons[0].id) }
-               })
+          const correctAnswers = userResponse.filter((item) => item.is_correct);
 
-               const progress = await prisma.progress.create({
-                    data: {
-                         user_id: Number(id),
-                         course_id: Number(course_id),
-                         count_lessons: Number(count_lessons.length),
-                         completed_lessons: 0,
-                         count_tests: Number(count_tests.length),
-                         correct_answers_of_tests: 0,
-                         incorrect_answers_of_tests: 0
-                    }
-               })
+          return {
+            completed_lessons: testData.length === userResponse.length ? 1 : 0,
+            count_tests: testData.length,
+            correct_answers_of_tests: correctAnswers.length,
+            incorrect_answers_of_tests:
+              userResponse.length - correctAnswers.length,
+          };
+        })
+      );
 
-               return res.status(200).json({ progress })
-          }
+      const progress = tests.reduce(
+        (acc, current) => {
+          acc.completed_lessons += current.completed_lessons;
+          acc.count_tests += current.count_tests;
+          acc.correct_answers_of_tests += current.correct_answers_of_tests;
+          acc.incorrect_answers_of_tests += current.incorrect_answers_of_tests;
+          return acc;
+        },
+        {
+          completed_lessons: 0,
+          count_tests: 0,
+          correct_answers_of_tests: 0,
+          incorrect_answers_of_tests: 0,
+        }
+      );
 
+      progress.count_lessons = countLessons.length;
 
-          catch (error) {
-               return next(ApiError.internal(error.message))
-          }
-     }
+      return res.status(200).json({ progress });
+    } catch (error) {
+      return next(ApiError.internal(error.message));
+    }
+  }
 }
 
-module.exports = new ProgressController()
+module.exports = new ProgressController();
