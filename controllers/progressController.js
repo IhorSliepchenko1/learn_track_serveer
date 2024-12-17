@@ -5,7 +5,7 @@ class ProgressController {
   async checkProgress(req, res, next) {
     try {
       const { id } = req.user;
-      const { course_id } = req.body;
+      const { course_id } = req.query;
 
       if (!course_id) {
         return next(ApiError.badRequest("ID курса обязателен"));

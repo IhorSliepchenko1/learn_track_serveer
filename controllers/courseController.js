@@ -154,12 +154,14 @@ class CourseController {
         prisma.course.count(),
       ]);
 
-      return res.status(200).json({
+      const data = {
         data: courses,
         total: totalCount,
         page: Number(page),
         totalPages: Math.ceil(totalCount / limit),
-      });
+      };
+
+      return res.status(200).json(data);
     } catch (error) {
       return next(ApiError.internal(error.message));
     }
