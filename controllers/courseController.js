@@ -58,14 +58,6 @@ class CourseController {
         return next(ApiError.notFound(`курс не найден`));
       }
 
-      const checkTitle = await prisma.course.findFirst({ where: { title } });
-
-      if (checkTitle.title === title) {
-        return next(
-          ApiError.badRequest(`курс с таким названием уже существует`)
-        );
-      }
-
       let fileName;
 
       if (req.files && req.files.img) {
@@ -75,6 +67,17 @@ class CourseController {
         console.log(fileName);
       } else {
         fileName = null;
+      }
+
+      if (title) {
+        const checkTitle = await prisma.course.findFirst({
+          where: { title },
+        });
+
+        if (checkTitle)
+          return next(
+            ApiError.badRequest(`курс с таким названием уже существует`)
+          );
       }
 
       const course = await prisma.course.update({
@@ -182,8 +185,10 @@ class CourseController {
         return next(ApiError.notFound(`Курс не обнаружен!`));
       }
 
-      return res.status(200).json(user);
+      return res.status(200).json(course);
     } catch (error) {
+      console.log(error);
+
       return next(ApiError.internal(error.message));
     }
   }
