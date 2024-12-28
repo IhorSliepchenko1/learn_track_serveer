@@ -1,10 +1,27 @@
 const ApiError = require(`../error/ApiError`);
 const { prisma } = require(`../prisma/prisma-clients`);
+const path = require(`path`);
+const fs = require(`fs`).promises;
+const mammoth = require(`mammoth`);
 
 class LessonController {
   async add(req, res, next) {
     try {
-      const { course_id, title, content } = req.body;
+      const { course_id, title } = req.body;
+
+      let content;
+
+      if (req.files) {
+        const { file } = req.files;
+        file.mv(path.resolve(__dirname, "..", "static", file.name));
+        const filePath = path.join(__dirname, "..", "static", file.name);
+        const htmlData = await mammoth.convertToHtml({ path: filePath });
+        content = htmlData.value;
+
+        await fs.unlink(filePath);
+      } else {
+        return next(ApiError.notFound(`Файл не передан`));
+      }
 
       const checkCourseId = await prisma.course.findFirst({
         where: { id: Number(course_id) },
@@ -42,9 +59,19 @@ class LessonController {
   async update(req, res, next) {
     try {
       const { id } = req.params;
-      const { course_id, title, content } = req.body;
+      const { course_id, title } = req.body;
 
-      console.log(title);
+      let content;
+
+      if (req.files) {
+        const { file } = req.files;
+        file.mv(path.resolve(__dirname, "..", "static", file.name));
+        const filePath = path.join(__dirname, "..", "static", file.name);
+        const htmlData = await mammoth.convertToHtml({ path: filePath });
+        content = htmlData.value;
+
+        await fs.unlink(filePath);
+      } 
 
       if (course_id) {
         const checkCourseId = await prisma.course.findFirst({
@@ -126,30 +153,32 @@ class LessonController {
       const { page = 1, limit = 10 } = req.query;
       const skip = (page - 1) * limit;
 
-      const { course_id } = req.body;
+      const { id } = req.params;
 
-      if (!course_id) {
+      if (!id) {
         return next(ApiError.notFound("course_id отсутствует"));
       }
 
       const [lessons, totalCount] = await Promise.all([
         prisma.lesson.findMany({
-          where: { course_id: Number(course_id) },
+          where: { course_id: Number(id) },
           skip: Number(skip),
           take: Number(limit),
           orderBy: { createdAt: "desc" },
         }),
         prisma.lesson.count({
-          where: { course_id: Number(course_id) },
+          where: { course_id: Number(id) },
         }),
       ]);
 
-      return res.status(200).json({
+      const data = {
         data: lessons,
         total: totalCount,
         page: Number(page),
         totalPages: Math.ceil(totalCount / limit),
-      });
+      };
+
+      return res.status(200).json(data);
     } catch (error) {
       return next(ApiError.internal(error.message));
     }
