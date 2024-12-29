@@ -9,6 +9,10 @@ class LessonController {
     try {
       const { course_id, title } = req.body;
 
+      if (!title || !course_id) {
+        return next(ApiError.notFound(`Все данные обязательны`));
+      }
+
       let content;
 
       if (req.files) {
@@ -63,15 +67,17 @@ class LessonController {
 
       let content;
 
+      console.log(content);
+
       if (req.files) {
-        const { file } = req.files;
+        const { file } = await req.files;
         file.mv(path.resolve(__dirname, "..", "static", file.name));
         const filePath = path.join(__dirname, "..", "static", file.name);
         const htmlData = await mammoth.convertToHtml({ path: filePath });
         content = htmlData.value;
 
-        await fs.unlink(filePath);
-      } 
+        // await fs.unlink(filePath);
+      }
 
       if (course_id) {
         const checkCourseId = await prisma.course.findFirst({
